@@ -63,12 +63,11 @@ if hist:
     faltantes = analisar_ciclo(hist)
     st.warning(f"🎯 Próximo Concurso: {conc+1} | Faltam no Ciclo: {faltantes}")
     
-    # ATUALIZADO: Agora gera 50 jogos
     if st.button("🚀 GERAR 50 JOGOS DE ELITE", use_container_width=True):
         base = list(set(faltantes + random.sample(ultimo, 9)))
         outros = [n for n in range(1, 26) if n not in base]
         random.shuffle(outros)
-        dezenas_18 = sorted(base + outros[:18-len(base)])
+        dezenas_18 = sorted(base +容outros[:18-len(base)])
         
         pool = list(itertools.combinations(dezenas_18, 15))
         random.shuffle(pool)
@@ -80,13 +79,12 @@ if hist:
                 lucro, counts = simular_lucro(jogo, hist)
                 if lucro >= 65:
                     jogos_v10.append({'jogo': jogo, 'lucro': lucro, 'counts': counts})
-            # Limite atualizado para 50
             if len(jogos_v10) >= 50: break
         
         st.session_state.jogos = jogos_v10
 
     if 'jogos' in st.session_state:
-        st.success(f"Foram gerados {len(st.session_state.jogos)} jogos otimizados!")
+        st.success(f"Gerados {len(st.session_state.jogos)} jogos!")
         for i, item in enumerate(st.session_state.jogos, 1):
             icones = ""
             if item['counts'][15] > 0: icones += " 💵"
@@ -102,41 +100,22 @@ if hist:
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 14)
-            pdf.cell(200, 10, f"LotoElite V10 - 50 Jogos Sugeridos", ln=True, align='C')
+            pdf.cell(200, 10, f"LotoElite V10 - Jogos", ln=True, align='C')
             pdf.set_font("Courier", '', 10)
+            
             for i, j in enumerate(st.session_state.jogos, 1):
-                txt = " ".join(f"{n:02d}" for n in j['jogo'])
+                txt_j = " ".join(f"{n:02d}" for n in j['jogo'])
                 status = ""
                 if j['counts'][15] > 0: status += "[$$$]"
                 if j['counts'][14] > 0: status += "[FOGO]"
                 if j['counts'][13] > 0: status += "[MOEDA]"
-                pdf.cell(0, 8, f"{i:02d}: {txt} | Lucro: R${j['lucro']} {status}", ln=True)
+                pdf.cell(0, 8, f"{i:02d}: {txt_j} | Lucro: R${j['lucro']} {status}", ln=True)
             
             pdf_bytes = pdf.output(dest="S").encode("latin-1")
             b64 = base64.b64encode(pdf_bytes).decode()
-            html = f'<a href="data:application/pdf;base64,{b64}" download="jogos_elite_50.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#007bff;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;">📥 Baixar PDF com 50 Jogos</button></a>'
+            html = f'<a href="data:application/pdf;base64,{b64}" download="jogos_elite.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#007bff;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;">📥 Baixar PDF</button></a>'
             st.markdown(html, unsafe_allow_html=True)
-
 else:
-    st.error("Erro ao conectar com a API.")
+    st.error("Erro na API.")
 
-if st.button("🔄 Sincronizar Dados"):
-    st.session_state.dados = buscar_dados()
-    st.rerun()
-                if j['counts'][15] > 0: status += "[$$$]"
-                if j['counts'][14] > 0: status += "[FOGO]"
-                if j['counts'][13] > 0: status += "[MOEDA]"
-                pdf.cell(0, 8, f"{i:02d}: {txt} | Lucro: R${j['lucro']} {status}", ln=True)
-            
-            pdf_bytes = pdf.output(dest="S").encode("latin-1")
-            b64 = base64.b64encode(pdf_bytes).decode()
-            html = f'<a href="data:application/pdf;base64,{b64}" download="jogos_elite.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#007bff;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;">📥 Baixar Arquivo PDF</button></a>'
-            st.markdown(html, unsafe_allow_html=True)
-
-else:
-    st.error("Erro ao conectar com a API da Caixa.")
-
-if st.button("🔄 Sincronizar Dados"):
-    st.session_state.dados = buscar_dados()
-    st.rerun()
 
