@@ -4,11 +4,11 @@ import requests
 import random
 import itertools
 from fpdf import FPDF
-from datetime import datetime
 import base64
+import time
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="LotoElite V10", page_icon="💰", layout="centered")
+st.set_page_config(page_title="LotoElite V10 PRO", page_icon="💰", layout="centered")
 
 # --- LÓGICA DE INTELIGÊNCIA ---
 def buscar_dados():
@@ -24,7 +24,8 @@ def buscar_dados():
 
 def analisar_ciclo(historico):
     todos = set(range(1, 26))
-    ciclo_atual = set(); faltantes = set()
+    ciclo_atual = set()
+    faltantes = set()
     for jogo in historico:
         ciclo_atual.update(jogo)
         if len(ciclo_atual) == 25: break
@@ -51,7 +52,7 @@ def simular_lucro(jogo, historico):
     return total, c
 
 # --- INTERFACE ---
-st.title("💰 LotoElite V10 Mobile")
+st.title("💰 LotoElite V10 PRO")
 st.markdown("---")
 
 if 'dados' not in st.session_state:
@@ -63,60 +64,74 @@ if hist:
     faltantes = analisar_ciclo(hist)
     st.warning(f"🎯 Próximo Concurso: {conc+1} | Faltam no Ciclo: {faltantes}")
     
-    if st.button("🚀 GERAR 50 JOGOS DE ELITE", use_container_width=True):
-        # Correção da linha 70: Removido caractere estranho e corrigida lógica de fatiamento
-        base = list(set(faltantes + random.sample(ultimo, 9)))
-        outros = [n for n in range(1, 26) if n not in base]
-        random.shuffle(outros)
-        
-        qtd_necessaria = max(0, 18 - len(base))
-        dezenas_18 = sorted(base + outros[:qtd_necessaria])
-        
-        pool = list(itertools.combinations(dezenas_18, 15))
-        random.shuffle(pool)
-        
-        jogos_v10 = []
-        for c_comb in pool:
-            jogo = sorted(list(c_comb))
-            if validar_v10(jogo, ultimo, faltantes):
-                lucro, counts = simular_lucro(jogo, hist)
-                if lucro >= 65:
-                    jogos_v10.append({'jogo': jogo, 'lucro': lucro, 'counts': counts})
-            if len(jogos_v10) >= 50: break
-        
-        st.session_state.jogos = jogos_v10
+    col1, col2 = st.columns(2)
+    
+    # BOTÃO MANUAL (50 JOGOS)
+    with col1:
+        if st.button("🚀 GERAR 50 JOGOS", use_container_width=True):
+            base = list(set(faltantes + random.sample(ultimo, 9)))
+            outros = [n for n in range(1, 26) if n not in base]
+            random.shuffle(outros)
+            dezenas_18 = sorted(base + outros[:max(0, 18-len(base))])
+            pool = list(itertools.combinations(dezenas_18, 15))
+            random.shuffle(pool)
+            
+            novos_jogos = []
+            for comb in pool:
+                jogo = sorted(list(comb))
+                if validar_v10(jogo, ultimo, faltantes):
+                    lucro, counts = simular_lucro(jogo, hist)
+                    if lucro >= 65:
+                        novos_jogos.append({'jogo': jogo, 'lucro': lucro, 'counts': counts})
+                if len(novos_jogos) >= 50: break
+            st.session_state.jogos = novos_jogos
 
+    # NOVO BOTÃO: BUSCA AUTOMÁTICA
+    with col2:
+        if st.button("🔍 BUSCA MILIONÁRIA", use_container_width=True):
+            encontrou = False
+            placeholder = st.empty()
+            tentativas = 0
+            
+            while not encontrou:
+                tentativas += 1
+                placeholder.info(f"Analisando combinações... Tentativa {tentativas}")
+                
+                # Gera novo set de dezenas para testar
+                base = list(set(faltantes + random.sample(ultimo, 9)))
+                outros = [n for n in range(1, 26) if n not in base]
+                random.shuffle(outros)
+                dezenas_18 = sorted(base + outros[:max(0, 18-len(base))])
+                
+                pool = list(itertools.combinations(dezenas_18, 15))
+                random.shuffle(pool)
+                
+                for comb in pool[:50]: # Testa 50 de cada vez para ser rápido
+                    jogo = sorted(list(comb))
+                    lucro, counts = simular_lucro(jogo, hist)
+                    
+                    if counts[15] > 0: # CRITÉRIO MILIONÁRIO
+                        st.session_state.jogos = [{'jogo': jogo, 'lucro': lucro, 'counts': counts}]
+                        encontrou = True
+                        st.balloons()
+                        st.success("🎉 JOGADA MILIONÁRIA ENCONTRADA!")
+                        break
+                
+                if tentativas > 1000: # Limite de segurança para não travar
+                    st.error("Muitas tentativas sem sucesso. Tente novamente.")
+                    break
+
+    # EXIBIÇÃO DOS RESULTADOS
     if 'jogos' in st.session_state:
-        st.success(f"Gerados {len(st.session_state.jogos)} jogos!")
         for i, item in enumerate(st.session_state.jogos, 1):
             icones = ""
-            if item['counts'][15] > 0: icones += " 💵"
+            if item['counts'][15] > 0: icones += " 💵 JOGADA MILIONÁRIA"
             if item['counts'][14] > 0: icones += " 🔥"
             if item['counts'][13] > 0: icones += " 💰"
             
-            txt_jogo = " ".join(f"{n:02d}" for n in item['jogo'])
-            with st.expander(f"Jogo {i:02d} | R$ {item['lucro']}{icones}"):
-                st.code(txt_jogo)
-                st.write(f"Histórico (100 conc): 13p: {item['counts'][13]} | 14p: {item['counts'][14]} | 15p: {item['counts'][15]}")
+            with st.expander(f"Resultado {i:02d} | {icones}"):
+                st.code(" ".join(f"{n:02d}" for n in item['jogo']))
+                st.write(f"Acertos Históricos: 15p: {item['counts'][15]} | 14p: {item['counts'][14]} | 13p: {item['counts'][13]}")
 
-        if st.button("📄 BAIXAR PDF (50 JOGOS)", use_container_width=True):
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", 'B', 14)
-            pdf.cell(200, 10, f"LotoElite V10 - Jogos", ln=True, align='C')
-            pdf.set_font("Courier", '', 10)
-            
-            for i, j in enumerate(st.session_state.jogos, 1):
-                txt_j = " ".join(f"{n:02d}" for n in j['jogo'])
-                status = ""
-                if j['counts'][15] > 0: status += "[$$$]"
-                if j['counts'][14] > 0: status += "[FOGO]"
-                if j['counts'][13] > 0: status += "[MOEDA]"
-                pdf.cell(0, 8, f"{i:02d}: {txt_j} | Lucro: R${j['lucro']} {status}", ln=True)
-            
-            pdf_bytes = pdf.output(dest="S").encode("latin-1")
-            b64 = base64.b64encode(pdf_bytes).decode()
-            html = f'<a href="data:application/pdf;base64,{b64}" download="jogos_elite.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#007bff;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;">📥 Baixar PDF</button></a>'
-            st.markdown(html, unsafe_allow_html=True)
 else:
     st.error("Erro na API ou Conexão.")
