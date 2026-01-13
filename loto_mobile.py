@@ -23,7 +23,7 @@ def buscar_dados():
     except: return None, None, None, None
 
 def analisar_ciclo(historico):
-    todos = set(range(1, 26))
+    todos = set(range(1, 25)) # De 1 a 25
     ciclo_atual = set()
     faltantes = set()
     for jogo in historico:
@@ -86,7 +86,7 @@ if hist:
                 if len(novos_jogos) >= 50: break
             st.session_state.jogos = novos_jogos
 
-    # NOVO BOTÃO: BUSCA AUTOMÁTICA
+    # BOTÃO: BUSCA AUTOMÁTICA
     with col2:
         if st.button("🔍 BUSCA MILIONÁRIA", use_container_width=True):
             encontrou = False
@@ -97,7 +97,6 @@ if hist:
                 tentativas += 1
                 placeholder.info(f"Analisando combinações... Tentativa {tentativas}")
                 
-                # Gera novo set de dezenas para testar
                 base = list(set(faltantes + random.sample(ultimo, 9)))
                 outros = [n for n in range(1, 26) if n not in base]
                 random.shuffle(outros)
@@ -106,32 +105,54 @@ if hist:
                 pool = list(itertools.combinations(dezenas_18, 15))
                 random.shuffle(pool)
                 
-                for comb in pool[:50]: # Testa 50 de cada vez para ser rápido
+                for comb in pool[:100]:
                     jogo = sorted(list(comb))
                     lucro, counts = simular_lucro(jogo, hist)
                     
-                    if counts[15] > 0: # CRITÉRIO MILIONÁRIO
+                    if counts[15] > 0:
                         st.session_state.jogos = [{'jogo': jogo, 'lucro': lucro, 'counts': counts}]
                         encontrou = True
                         st.balloons()
                         st.success("🎉 JOGADA MILIONÁRIA ENCONTRADA!")
                         break
                 
-                if tentativas > 1000: # Limite de segurança para não travar
-                    st.error("Muitas tentativas sem sucesso. Tente novamente.")
+                if tentativas > 2000:
+                    st.error("Limite de tentativas atingido. Tenta novamente!")
                     break
 
     # EXIBIÇÃO DOS RESULTADOS
     if 'jogos' in st.session_state:
         for i, item in enumerate(st.session_state.jogos, 1):
             icones = ""
-            if item['counts'][15] > 0: icones += " 💵 JOGADA MILIONÁRIA"
+            if item['counts'][15] > 0: icones += " 💵 MILIONÁRIA"
             if item['counts'][14] > 0: icones += " 🔥"
             if item['counts'][13] > 0: icones += " 💰"
             
-            with st.expander(f"Resultado {i:02d} | {icones}"):
+            with st.expander(f"Jogo {i:02d} | {icones}"):
                 st.code(" ".join(f"{n:02d}" for n in item['jogo']))
-                st.write(f"Acertos Históricos: 15p: {item['counts'][15]} | 14p: {item['counts'][14]} | 13p: {item['counts'][13]}")
+                st.write(f"Histórico: 15p: {item['counts'][15]} | 14p: {item['counts'][14]} | 13p: {item['counts'][13]}")
+
+        st.markdown("---")
+        # --- BOTÃO DO PDF REINTEGRADO ---
+        if st.button("📄 GERAR PDF PARA WHATSAPP", use_container_width=True):
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(200, 10, f"LotoElite V10 PRO - Concurso {conc+1}", ln=True, align='C')
+            pdf.set_font("Courier", '', 10)
+            
+            for i, j in enumerate(st.session_state.jogos, 1):
+                txt_j = " ".join(f"{n:02d}" for n in j['jogo'])
+                status = ""
+                if j['counts'][15] > 0: status += "[MILIONARIA]"
+                if j['counts'][14] > 0: status += "[FOGO]"
+                if j['counts'][13] > 0: status += "[MOEDA]"
+                pdf.cell(0, 8, f"{i:02d}: {txt_j} | {status}", ln=True)
+            
+            pdf_bytes = pdf.output(dest="S").encode("latin-1")
+            b64 = base64.b64encode(pdf_bytes).decode()
+            html = f'<a href="data:application/pdf;base64,{b64}" download="lotoelite_pro.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#28a745;color:white;border:none;padding:12px;border-radius:5px;cursor:pointer;font-weight:bold;">📥 BAIXAR PDF AGORA</button></a>'
+            st.markdown(html, unsafe_allow_html=True)
 
 else:
     st.error("Erro na API ou Conexão.")
