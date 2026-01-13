@@ -64,17 +64,20 @@ if hist:
     st.warning(f"🎯 Próximo Concurso: {conc+1} | Faltam no Ciclo: {faltantes}")
     
     if st.button("🚀 GERAR 50 JOGOS DE ELITE", use_container_width=True):
+        # Correção da linha 70: Removido caractere estranho e corrigida lógica de fatiamento
         base = list(set(faltantes + random.sample(ultimo, 9)))
         outros = [n for n in range(1, 26) if n not in base]
         random.shuffle(outros)
-        dezenas_18 = sorted(base +容outros[:18-len(base)])
+        
+        qtd_necessaria = max(0, 18 - len(base))
+        dezenas_18 = sorted(base + outros[:qtd_necessaria])
         
         pool = list(itertools.combinations(dezenas_18, 15))
         random.shuffle(pool)
         
         jogos_v10 = []
-        for c in pool:
-            jogo = sorted(list(c))
+        for c_comb in pool:
+            jogo = sorted(list(c_comb))
             if validar_v10(jogo, ultimo, faltantes):
                 lucro, counts = simular_lucro(jogo, hist)
                 if lucro >= 65:
@@ -116,6 +119,4 @@ if hist:
             html = f'<a href="data:application/pdf;base64,{b64}" download="jogos_elite.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#007bff;color:white;border:none;padding:10px;border-radius:5px;cursor:pointer;">📥 Baixar PDF</button></a>'
             st.markdown(html, unsafe_allow_html=True)
 else:
-    st.error("Erro na API.")
-
-
+    st.error("Erro na API ou Conexão.")
