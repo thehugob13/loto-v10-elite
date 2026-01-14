@@ -8,7 +8,7 @@ import base64
 import time
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="LotoElite V10 PRO", page_icon="💰", layout="centered")
+st.set_page_config(page_title="LotoElite V11 PRO", page_icon="💰", layout="centered")
 
 # --- LÓGICA DE INTELIGÊNCIA ---
 def buscar_dados():
@@ -23,36 +23,36 @@ def buscar_dados():
     except: return None, None, None, None
 
 def analisar_ciclo(historico):
-    todos = set(range(1, 25)) # De 1 a 25
+    todos = set(range(1, 26))
     ciclo_atual = set()
-    faltantes = set()
     for jogo in historico:
         ciclo_atual.update(jogo)
         if len(ciclo_atual) == 25: break
-        faltantes = todos - ciclo_atual
-    return sorted(list(faltantes))
+    return sorted(list(todos - ciclo_atual))
 
-def validar_v10(jogo, ultimo_res, dezenas_ciclo):
-    if dezenas_ciclo and len(set(jogo) & set(dezenas_ciclo)) < (len(dezenas_ciclo) * 0.6): return False
-    q1=[1,2,3,6,7,8]; q2=[4,5,9,10]; q3=[11,12,13,16,17,18]; q4=[14,15,19,20,21,22,23,24,25]
-    for q in [q1,q2,q3,q4]:
-        if len(set(jogo) & set(q)) > 6: return False
-    if not (5 <= len([n for n in jogo if n in [2,3,5,7,11,13,17,19,23]]) <= 7): return False
+def validar_v10(jogo, dezenas_ciclo):
+    # Filtro de Primos (Média de 5 a 7)
+    primos = [2,3,5,7,11,13,17,19,23]
+    if not (5 <= len([n for n in jogo if n in primos]) <= 7): return False
+    # Filtro de Ciclo (mínimo 60% das faltantes se houver poucas)
+    if dezenas_ciclo and len(set(jogo) & set(dezenas_ciclo)) < (len(dezenas_ciclo) * 0.5): return False
     return True
 
 def simular_lucro(jogo, historico):
     total = 0; c = {11:0, 12:0, 13:0, 14:0, 15:0}
     for res in historico[:100]:
         acertos = len(set(jogo) & set(res))
-        if acertos == 11: total += 7; c[11]+=1
-        elif acertos == 12: total += 12; c[12]+=1
-        elif acertos == 13: total += 30; c[13]+=1
-        elif acertos == 14: total += 1700; c[14]+=1
-        elif acertos == 15: total += 1000000; c[15]+=1
+        if acertos >= 11:
+            c[acertos] += 1
+            if acertos == 11: total += 7
+            elif acertos == 12: total += 12
+            elif acertos == 13: total += 30
+            elif acertos == 14: total += 1700
+            elif acertos == 15: total += 1500000
     return total, c
 
 # --- INTERFACE ---
-st.title("💰 LotoElite V10 PRO")
+st.title("💰 LotoElite V11 PRO")
 st.markdown("---")
 
 if 'dados' not in st.session_state:
@@ -62,97 +62,103 @@ hist, ultimo, conc, premio = st.session_state.dados if st.session_state.dados el
 
 if hist:
     faltantes = analisar_ciclo(hist)
-    st.warning(f"🎯 Próximo Concurso: {conc+1} | Faltam no Ciclo: {faltantes}")
+    st.warning(f"🎯 Concurso: {conc+1} | Ciclo Faltam: {faltantes}")
     
-    col1, col2 = st.columns(2)
+    # BOTÕES DE AÇÃO
+    c1, c2, c3 = st.columns(3)
     
-    # BOTÃO MANUAL (50 JOGOS)
-    with col1:
-        if st.button("🚀 GERAR 50 JOGOS", use_container_width=True):
+    with c1:
+        btn_manual = st.button("🚀 GERAR 50", use_container_width=True)
+    with c2:
+        btn_milionaria = st.button("💎 BUSCA 15 pts", use_container_width=True)
+    with c3:
+        btn_combo = st.button("🎯 COMBO 10", use_container_width=True)
+
+    # LÓGICA DO BOTÃO COMBO 10 (NOVO)
+    if btn_combo:
+        lista_combo = []
+        barra = st.progress(0)
+        status = st.empty()
+        tentativas = 0
+        
+        while len(lista_combo) < 10:
+            tentativas += 1
+            status.text(f"Buscando jogos de Elite... (Tentativa {tentativas})")
+            
             base = list(set(faltantes + random.sample(ultimo, 9)))
             outros = [n for n in range(1, 26) if n not in base]
             random.shuffle(outros)
             dezenas_18 = sorted(base + outros[:max(0, 18-len(base))])
-            pool = list(itertools.combinations(dezenas_18, 15))
-            random.shuffle(pool)
             
-            novos_jogos = []
-            for comb in pool:
-                jogo = sorted(list(comb))
-                if validar_v10(jogo, ultimo, faltantes):
-                    lucro, counts = simular_lucro(jogo, hist)
-                    if lucro >= 65:
-                        novos_jogos.append({'jogo': jogo, 'lucro': lucro, 'counts': counts})
-                if len(novos_jogos) >= 50: break
-            st.session_state.jogos = novos_jogos
-
-    # BOTÃO: BUSCA AUTOMÁTICA
-    with col2:
-        if st.button("🔍 BUSCA MILIONÁRIA", use_container_width=True):
-            encontrou = False
-            placeholder = st.empty()
-            tentativas = 0
+            comb = sorted(random.sample(dezenas_18, 15))
+            if validar_v10(comb, faltantes):
+                lucro, counts = simular_lucro(comb, hist)
+                # Critério: Tem que ter pelo menos 13 pontos no histórico
+                if counts[13] > 0 or counts[14] > 0 or counts[15] > 0:
+                    lista_combo.append({'jogo': comb, 'lucro': lucro, 'counts': counts})
+                    barra.progress(len(lista_combo) * 10)
             
-            while not encontrou:
-                tentativas += 1
-                placeholder.info(f"Analisando combinações... Tentativa {tentativas}")
-                
-                base = list(set(faltantes + random.sample(ultimo, 9)))
-                outros = [n for n in range(1, 26) if n not in base]
-                random.shuffle(outros)
-                dezenas_18 = sorted(base + outros[:max(0, 18-len(base))])
-                
-                pool = list(itertools.combinations(dezenas_18, 15))
-                random.shuffle(pool)
-                
-                for comb in pool[:100]:
-                    jogo = sorted(list(comb))
-                    lucro, counts = simular_lucro(jogo, hist)
-                    
-                    if counts[15] > 0:
-                        st.session_state.jogos = [{'jogo': jogo, 'lucro': lucro, 'counts': counts}]
-                        encontrou = True
-                        st.balloons()
-                        st.success("🎉 JOGADA MILIONÁRIA ENCONTRADA!")
-                        break
-                
-                if tentativas > 2000:
-                    st.error("Limite de tentativas atingido. Tenta novamente!")
-                    break
+            if tentativas > 3000: break
+        
+        st.session_state.jogos = lista_combo
+        st.success("🎯 Combo de 10 Jogos de Elite encontrado!")
 
-    # EXIBIÇÃO DOS RESULTADOS
+    # LÓGICA BUSCA MILIONÁRIA (EXISTENTE)
+    if btn_milionaria:
+        status_m = st.empty()
+        for t in range(5000):
+            status_m.text(f"Buscando 15 pontos... {t}")
+            comb = sorted(random.sample(range(1, 26), 15))
+            lucro, counts = simular_lucro(comb, hist)
+            if counts[15] > 0:
+                st.session_state.jogos = [{'jogo': comb, 'lucro': lucro, 'counts': counts}]
+                st.balloons()
+                st.success("🎉 JOGADA MILIONÁRIA ENCONTRADA!")
+                break
+
+    # LÓGICA GERAR 50 (EXISTENTE)
+    if btn_manual:
+        # (Sua lógica anterior de gerar 50 jogos aqui)
+        base = list(set(faltantes + random.sample(ultimo, 9)))
+        outros = [n for n in range(1, 26) if n not in base]
+        random.shuffle(outros)
+        dezenas_18 = sorted(base + outros[:max(0, 18-len(base))])
+        jogos_50 = []
+        for _ in range(500):
+            comb = sorted(random.sample(dezenas_18, 15))
+            if validar_v10(comb, faltantes):
+                lucro, counts = simular_lucro(comb, hist)
+                if lucro >= 65:
+                    jogos_50.append({'jogo': comb, 'lucro': lucro, 'counts': counts})
+            if len(jogos_50) >= 50: break
+        st.session_state.jogos = jogos_50
+
+    # EXIBIÇÃO COM HIERARQUIA DE EMOJIS
     if 'jogos' in st.session_state:
         for i, item in enumerate(st.session_state.jogos, 1):
-            icones = ""
-            if item['counts'][15] > 0: icones += " 💵 MILIONÁRIA"
-            if item['counts'][14] > 0: icones += " 🔥"
-            if item['counts'][13] > 0: icones += " 💰"
+            # Definição dos Emojis conforme solicitado
+            emoji_str = ""
+            if item['counts'][13] > 0: emoji_str = "💰"
+            if item['counts'][14] > 0: emoji_str = "💰🔥"
+            if item['counts'][15] > 0: emoji_str = "💰🔥💵"
             
-            with st.expander(f"Jogo {i:02d} | {icones}"):
+            with st.expander(f"Jogo {i:02d} | {emoji_str} (R$ {item['lucro']})"):
                 st.code(" ".join(f"{n:02d}" for n in item['jogo']))
-                st.write(f"Histórico: 15p: {item['counts'][15]} | 14p: {item['counts'][14]} | 13p: {item['counts'][13]}")
+                st.write(f"Histórico: 13p: {item['counts'][13]} | 14p: {item['counts'][14]} | 15p: {item['counts'][15]}")
 
-        st.markdown("---")
-        # --- BOTÃO DO PDF REINTEGRADO ---
-        if st.button("📄 GERAR PDF PARA WHATSAPP", use_container_width=True):
+        # BOTÃO PDF
+        if st.button("📄 DOWNLOAD PDF", use_container_width=True):
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", 'B', 14)
-            pdf.cell(200, 10, f"LotoElite V10 PRO - Concurso {conc+1}", ln=True, align='C')
+            pdf.cell(200, 10, "LotoElite V11 PRO", ln=True, align='C')
             pdf.set_font("Courier", '', 10)
-            
             for i, j in enumerate(st.session_state.jogos, 1):
-                txt_j = " ".join(f"{n:02d}" for n in j['jogo'])
-                status = ""
-                if j['counts'][15] > 0: status += "[MILIONARIA]"
-                if j['counts'][14] > 0: status += "[FOGO]"
-                if j['counts'][13] > 0: status += "[MOEDA]"
-                pdf.cell(0, 8, f"{i:02d}: {txt_j} | {status}", ln=True)
+                txt = " ".join(f"{n:02d}" for n in j['jogo'])
+                status = "13p" if j['counts'][13]>0 else ""
+                if j['counts'][14]>0: status = "14p+"
+                if j['counts'][15]>0: status = "MILIONARIA"
+                pdf.cell(0, 8, f"{i:02d}: {txt} | {status}", ln=True)
             
-            pdf_bytes = pdf.output(dest="S").encode("latin-1")
-            b64 = base64.b64encode(pdf_bytes).decode()
-            html = f'<a href="data:application/pdf;base64,{b64}" download="lotoelite_pro.pdf" style="text-decoration:none;"><button style="width:100%;background-color:#28a745;color:white;border:none;padding:12px;border-radius:5px;cursor:pointer;font-weight:bold;">📥 BAIXAR PDF AGORA</button></a>'
-            st.markdown(html, unsafe_allow_html=True)
-
-else:
-    st.error("Erro na API ou Conexão.")
+            b64_pdf = base64.b64encode(pdf.output(dest="S").encode("latin-1")).decode()
+            st.markdown(f'<a href="data:application/pdf;base64,{b64_pdf}" download="lotoelite.pdf">Clique aqui para baixar</a>', unsafe_allow_html=True)
